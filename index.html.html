@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WYZauto สั่งจากรายการ</title>
+<style>
+  :root{
+    --bg:#f4f7fb; --card:#fff; --text:#1b2433; --muted:#5d6b80; --line:#dfe5ee;
+    --brand:#1e88e5; --brand-ink:#fff; --accent:#f39200; --ok:#2e7d32; --warn:#b26a00; --err:#c62828;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#11161e; --card:#1a212c; --text:#e6ebf2; --muted:#9aa7b8; --line:#2c3644;
+      --brand:#4aa3f0; --brand-ink:#0b1420; --ok:#7bc67e; --warn:#f0b54a; --err:#ef7b7b; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:"Sarabun","Noto Sans Thai",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:16px;line-height:1.5}
+  header{background:linear-gradient(135deg,#1e88e5,#1565c0);color:#fff;padding:20px 16px}
+  header h1{margin:0;font-size:22px}
+  header p{margin:4px 0 0;opacity:.9;font-size:14px}
+  main{max-width:860px;margin:0 auto;padding:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+  h2{font-size:17px;margin:0 0 10px}
+  .drop{border:2px dashed var(--line);border-radius:10px;padding:22px 12px;text-align:center;cursor:pointer;color:var(--muted)}
+  .drop.over{border-color:var(--brand);color:var(--brand)}
+  .drop strong{color:var(--text)}
+  textarea{width:100%;min-height:90px;border:1px solid var(--line);border-radius:8px;padding:10px;font:inherit;background:var(--bg);color:var(--text)}
+  input[type=text],input[type=number]{border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;background:var(--bg);color:var(--text);width:100%}
+  button,.btn{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:8px;padding:9px 14px;font:inherit;font-weight:600;cursor:pointer;background:var(--brand);color:var(--brand-ink);text-decoration:none}
+  button.ghost{background:transparent;color:var(--brand);border:1px solid var(--brand)}
+  button.icon{background:transparent;color:var(--muted);padding:4px 8px}
+  .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  #status{font-size:14px;color:var(--muted);margin-top:8px;min-height:20px}
+  progress{width:100%;height:8px}
+  .preview{max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--line);margin-top:10px;display:none}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+  th{font-size:13px;color:var(--muted);font-weight:600}
+  td.qty{width:80px} td.act{width:40px;text-align:right}
+  td.brand{width:120px}
+  a.open{font-weight:600;color:var(--brand);white-space:nowrap}
+  .need{color:var(--warn);font-size:13px}
+  .empty{color:var(--muted);text-align:center;padding:18px}
+  .note{font-size:14px;color:var(--muted)}
+  .note li{margin:4px 0}
+  @media (max-width:600px){
+    thead{display:none}
+    table,tbody,tr,td{display:block;width:100%}
+    tr{border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:10px}
+    td{border:0;padding:4px 0}
+    td.qty,td.brand,td.act{width:100%}
+    td[data-l]::before{content:attr(data-l);display:block;font-size:12px;color:var(--muted)}
+    td.act{text-align:left}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>สั่งอะไหล่จากรายการ · WYZauto</h1>
+  <p>อัพโหลดรูป / Excel / CSV หรือวางรายการ แล้วกดลิงก์ไปหน้าสินค้าเพื่อใส่รถเข็น</p>
+</header>
+<main>
+  <section class="card">
+    <h2>1. ใส่รายการ</h2>
+    <div id="drop" class="drop" tabindex="0" role="button" aria-label="เลือกไฟล์">
+      <strong>แตะเพื่อเลือกไฟล์</strong> หรือลากไฟล์มาวาง<br>
+      <span style="font-size:14px">รูปภาพ (JPG/PNG), Excel (.xlsx) หรือ .csv · วางรูปด้วย Ctrl+V ได้</span>
+    </div>
+    <input id="file" type="file" accept="image/*,.xlsx,.xls,.csv,text/csv" hidden>
+    <img id="preview" class="preview" alt="รูปที่อัพโหลด">
+    <progress id="prog" value="0" max="1" hidden></progress>
+    <div id="status"></div>
+    <p class="note" style="margin:12px 0 6px">หรือพิมพ์/วางรายการ บรรทัดละ 1 รายการ: <code>รหัส จำนวน</code> เช่น <code>ngk-FR6EI 1</code> หรือ <code>0986AF7009 | 4</code></p>
+    <textarea id="paste" placeholder="bosch-1457429755   1&#10;tokic-B3560   2"></textarea>
+    <div class="row"><button id="addPaste">เพิ่มรายการที่พิมพ์</button></div>
+  </section>
+
+  <section class="card">
+    <h2>2. ตรวจรายการ แล้วกด “เปิด” เพื่อไปหน้าสินค้า</h2>
+    <table>
+      <thead><tr><th>รหัสสินค้า</th><th>แบรนด์</th><th>จำนวน</th><th>หน้าสินค้า</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="row">
+      <button class="ghost" id="addRow">+ เพิ่มแถว</button>
+      <button class="ghost" id="copy">คัดลอกรายการ</button>
+      <button class="ghost" id="csv">ดาวน์โหลด CSV</button>
+      <button class="ghost" id="clear">ล้างทั้งหมด</button>
+    </div>
+    <div id="copyStatus" class="note"></div>
+  </section>
+
+  <section class="card note">
+    <h2 style="color:var(--text)">วิธีใช้</h2>
+    <ol>
+      <li>เข้าสู่ระบบ wyzauto.com ด้วยบัญชีผู้ซื้อของคุณก่อน</li>
+      <li>ตรวจรหัสและจำนวนในตาราง แก้ได้ถ้าอ่านผิด (โดยเฉพาะ 0/O, 1/I, 5/S, 8/B)</li>
+      <li>กด “เปิด” ทีละรายการ เลือกผู้ขายราคาต่ำสุดแล้วกด ADD TO CART จากนั้นปรับจำนวนในรถเข็นให้ตรง</li>
+      <li>ถ้าหน้าสินค้าขึ้น “ไม่มีข้อเสนอ” แปลว่ายังไม่มีผู้ขายในพื้นที่ของคุณ</li>
+    </ol>
+    <p>รูปและไฟล์ถูกอ่านในเครื่องของคุณเท่านั้น ไม่ได้ส่งขึ้นเซิร์ฟเวอร์</p>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const SITE = 'https://wyzauto.com/#/products/';
+// แบรนด์ที่เดาได้จากรหัส (แก้/เพิ่มได้)
+const BRAND_RULES = [
+  [/^(0986|1457|0242|F00)/i, 'bosch'],
+  [/^1[ACOF]FT/i, 'aaron'],
+];
+const KNOWN_BRANDS = ['bosch','aaron','tokic','ngk','denso','aisin','kyb','brembo','mann','sakura'];
+
+let items = []; // {brand, code, qty}
+
+const $ = id => document.getElementById(id);
+const status = (t, cls) => { $('status').textContent = t; $('status').style.color = cls ? `var(--${cls})` : ''; };
+
+function guessBrand(code){
+  for (const [re, b] of BRAND_RULES) if (re.test(code)) return b;
+  return '';
+}
+function normalise(raw){
+  let s = raw.trim().replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g,'');
+  let brand = '', code = s;
+  const m = s.match(/^([A-Za-z]+)\s*-\s*([A-Za-z0-9].*)$/);
+  if (m && !/\d/.test(m[1])) { brand = m[1].toLowerCase(); code = m[2]; }
+  code = code.replace(/\s+/g,'').toUpperCase();
+  if (!brand) brand = guessBrand(code);
+  return {brand, code};
+}
+// แยกบรรทัด → [{brand, code, qty}]
+function parseText(text, fromOcr){
+  const out = [];
+  for (let line of text.split(/\r?\n/)) {
+    line = line.replace(/[|,;\t]/g,' ').replace(/\s+/g,' ').trim();
+    if (!line) continue;
+    const toks = line.split(' ');
+    // รหัส = token แรกที่มีตัวเลขและยาว >= 4 (รองรับ brand-CODE)
+    const ci = toks.findIndex(t => (/\d/.test(t) && t.replace(/[^A-Za-z0-9]/g,'').length >= 4) || /^[A-Za-z]{2,}-[A-Za-z0-9]{3,}$/.test(t));
+    if (ci < 0) continue;
+    let qty = null;
+    for (let i = toks.length - 1; i > ci; i--) {
+      const q = toks[i].replace(/[^0-9]/g,'');
+      if (q && q.length <= 4) { qty = parseInt(q,10); break; }
+    }
+    const {brand, code} = normalise(toks[ci]);
+    out.push({brand, code, qty: qty && qty > 0 ? qty : 1, check: !!fromOcr});
+  }
+  return out;
+}
+function addItems(list){
+  for (const it of list) {
+    const ex = items.find(x => x.code === it.code && (x.brand === it.brand || !x.brand || !it.brand));
+    if (ex) { ex.qty += it.qty; if (!ex.brand) ex.brand = it.brand; }
+    else items.push({brand: it.brand, code: it.code, qty: it.qty, check: it.check});
+  }
+  render();
+}
+function link(it){ return it.brand && it.code ? SITE + encodeURIComponent(it.brand) + '-' + encodeURIComponent(it.code) : ''; }
+
+function render(){
+  const tb = $('rows');
+  if (!items.length) { tb.innerHTML = '<tr><td colspan="5" class="empty">ยังไม่มีรายการ</td></tr>'; return; }
+  tb.innerHTML = '';
+  items.forEach((it, i) => {
+    const tr = document.createElement('tr');
+    const url = link(it);
+    tr.innerHTML = `
+      <td data-l="รหัสสินค้า"><input type="text" value="${it.code}" data-k="code" data-i="${i}" aria-label="รหัสสินค้า">${it.check ? '<div class="need">อ่านจากรูป — ตรวจรหัสอีกครั้ง</div>' : ''}</td>
+      <td class="brand" data-l="แบรนด์"><input type="text" list="brands" value="${it.brand}" data-k="brand" data-i="${i}" placeholder="เช่น ngk" aria-label="แบรนด์"></td>
+      <td class="qty" data-l="จำนวน"><input type="number" min="1" value="${it.qty}" data-k="qty" data-i="${i}" aria-label="จำนวน"></td>
+      <td data-l="หน้าสินค้า">${url ? `<a class="open" href="${url}" target="_blank" rel="noopener">เปิด ↗</a>` : '<span class="need">ใส่แบรนด์ก่อน</span>'}</td>
+      <td class="act"><button class="icon" data-del="${i}" aria-label="ลบ">✕</button></td>`;
+    tb.appendChild(tr);
+  });
+}
+$('rows').addEventListener('change', e => {
+  const el = e.target, i = +el.dataset.i, k = el.dataset.k;
+  if (k == null) return;
+  if (k === 'qty') items[i].qty = Math.max(1, parseInt(el.value,10) || 1);
+  else if (k === 'code') { items[i].check = false; const n = normalise(el.value); items[i].code = n.code; if (n.brand) items[i].brand = n.brand; }
+  else items[i].brand = el.value.trim().toLowerCase();
+  render();
+});
+$('rows').addEventListener('click', e => {
+  const d = e.target.dataset.del;
+  if (d != null) { items.splice(+d,1); render(); }
+});
+
+// ---------- ไฟล์ ----------
+const drop = $('drop');
+drop.onclick = () => $('file').click();
+drop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') $('file').click(); };
+$('file').onchange = e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value = ''; };
+['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) handleFile(f); });
+document.addEventListener('paste', e => {
+  if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+  const f = [...(e.clipboardData?.items || [])].find(x => x.type.startsWith('image/'))?.getAsFile();
+  if (f) handleFile(f);
+});
+
+async function handleFile(f){
+  const name = (f.name || '').toLowerCase();
+  try {
+    if (f.type.startsWith('image/')) await ocr(f);
+    else if (/\.(xlsx|xls)$/.test(name)) await readSheet(f);
+    else if (/\.csv$/.test(name) || f.type === 'text/csv') { const got = parseText(await f.text()); addItems(got); status(`อ่านได้ ${got.length} รายการ`, 'ok'); }
+    else status('ไฟล์นี้ยังไม่รองรับ ใช้รูป, .xlsx หรือ .csv', 'err');
+  } catch (err) { console.error(err); status('อ่านไฟล์ไม่สำเร็จ: ' + err.message, 'err'); }
+}
+
+async function readSheet(f){
+  if (!window.XLSX) throw new Error('โหลดตัวอ่าน Excel ไม่ได้ ลองเชื่อมต่ออินเทอร์เน็ตใหม่');
+  const wb = XLSX.read(await f.arrayBuffer());
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, blankrows:false});
+  // หาคอลัมน์รหัส (มีตัวเลข+ยาว) และคอลัมน์จำนวน (ตัวเลขเล็ก)
+  const width = Math.max(...rows.map(r => r.length));
+  let codeCol = -1, best = 0;
+  for (let c = 0; c < width; c++) {
+    const n = rows.filter(r => r[c] != null && /\d/.test(String(r[c])) && String(r[c]).replace(/[^A-Za-z0-9]/g,'').length >= 5).length;
+    if (n > best) { best = n; codeCol = c; }
+  }
+  if (codeCol < 0) throw new Error('ไม่พบคอลัมน์รหัสสินค้า');
+  let qtyCol = -1; best = 0;
+  for (let c = 0; c < width; c++) {
+    if (c === codeCol) continue;
+    const n = rows.filter(r => /^\d{1,4}$/.test(String(r[c] ?? '').trim())).length;
+    if (n > best) { best = n; qtyCol = c; }
+  }
+  const got = [];
+  for (const r of rows) {
+    const raw = r[codeCol]; if (raw == null || !/\d/.test(String(raw))) continue;
+    const q = qtyCol >= 0 ? parseInt(String(r[qtyCol] ?? '').trim(), 10) : NaN;
+    got.push({...normalise(String(raw)), qty: q > 0 ? q : 1});
+  }
+  addItems(got);
+  status(`อ่านจาก Excel ได้ ${got.length} รายการ`, 'ok');
+}
+
+async function ocr(f){
+  if (!window.Tesseract) throw new Error('โหลดตัวอ่านรูปไม่ได้ ลองเชื่อมต่ออินเทอร์เน็ตใหม่');
+  const url = URL.createObjectURL(f);
+  const img = $('preview'); img.src = url; img.style.display = 'block';
+  await img.decode();
+  // ขยาย 2 เท่า + ขาวดำ ช่วยให้อ่านแม่นขึ้น
+  const scale = Math.min(2, 3000 / Math.max(img.naturalWidth, img.naturalHeight));
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(img.naturalWidth * scale); cv.height = Math.round(img.naturalHeight * scale);
+  const cx = cv.getContext('2d'); cx.drawImage(img, 0, 0, cv.width, cv.height);
+  const d = cx.getImageData(0,0,cv.width,cv.height), p = d.data;
+  for (let i = 0; i < p.length; i += 4) { const g = 0.3*p[i]+0.59*p[i+1]+0.11*p[i+2]; p[i]=p[i+1]=p[i+2]=g; }
+  cx.putImageData(d,0,0);
+  const prog = $('prog'); prog.hidden = false; prog.value = 0;
+  status('กำลังอ่านรูป… (ครั้งแรกอาจใช้เวลาโหลดสักครู่)');
+  const worker = await Tesseract.createWorker('eng', 1, {
+    logger: m => { if (m.status === 'recognizing text') prog.value = m.progress; }
+  });
+  await worker.setParameters({
+    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-|., ',
+    preserve_interword_spaces: '1',
+  });
+  const { data } = await worker.recognize(cv);
+  await worker.terminate();
+  prog.hidden = true;
+  const got = parseText(data.text, true);
+  addItems(got);
+  status(got.length ? `อ่านจากรูปได้ ${got.length} รายการ — กรุณาตรวจรหัสและจำนวนอีกครั้ง` : 'อ่านรหัสจากรูปไม่ได้ ลองรูปที่ชัดขึ้น หรือพิมพ์เอง', got.length ? 'ok' : 'err');
+}
+
+// ---------- ปุ่มอื่นๆ ----------
+$('addPaste').onclick = () => {
+  const got = parseText($('paste').value);
+  if (!got.length) { status('ไม่พบรายการในข้อความ', 'err'); return; }
+  addItems(got); $('paste').value = ''; status(`เพิ่ม ${got.length} รายการ`, 'ok');
+};
+$('addRow').onclick = () => { items.push({brand:'', code:'', qty:1}); render(); };
+$('clear').onclick = () => { items = []; render(); $('preview').style.display = 'none'; status(''); };
+$('copy').onclick = async () => {
+  const txt = items.map(it => `${it.brand ? it.brand + '-' : ''}${it.code}\t${it.qty}${link(it) ? '\t' + link(it) : ''}`).join('\n');
+  try { await navigator.clipboard.writeText(txt); $('copyStatus').textContent = 'คัดลอกแล้ว'; }
+  catch { $('copyStatus').textContent = 'คัดลอกไม่ได้ในเบราว์เซอร์นี้'; }
+};
+$('csv').onclick = () => {
+  const rows = [['brand','code','qty','url'], ...items.map(it => [it.brand, it.code, it.qty, link(it)])];
+  const blob = new Blob(['﻿' + rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n')], {type:'text/csv'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'wyzauto-parts.csv'; a.click();
+};
+
+const dl = document.createElement('datalist'); dl.id = 'brands';
+dl.innerHTML = KNOWN_BRANDS.map(b => `<option value="${b}">`).join('');
+document.body.appendChild(dl);
+render();
+</script>
+</body>
+</html>
